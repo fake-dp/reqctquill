@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import styled from 'styled-components';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
@@ -13,9 +12,7 @@ const isIOS =
   /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const WritePage = () => {
-  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-
   const quillRef = useRef(null);
   const iosEnterHandlerAppliedRef = useRef(false);
 
@@ -25,17 +22,15 @@ const WritePage = () => {
 
   const handleKeyUp = () => {
     const editor = quillRef.current?.getEditor?.();
-    if (editor) {
-      const editorElem = editor.root;
-      if (editorElem.innerHTML === '<p><br></p>') {
-        editorElem.classList.add('ql-blank');
-      } else {
-        editorElem.classList.remove('ql-blank');
-      }
+    if (!editor) return;
+
+    const editorElem = editor.root;
+    if (editorElem.innerHTML === '<p><br></p>') {
+      editorElem.classList.add('ql-blank');
+    } else {
+      editorElem.classList.remove('ql-blank');
     }
   };
-
-  const handleTitleChange = (e) => setTitle(e.target.value);
 
   const imageHandler = () => {
     try {
@@ -49,20 +44,13 @@ const WritePage = () => {
         if (!input.files) return;
 
         const files = Array.from(input.files);
-        if (files.length > 5) {
-          setModalDescription('이미지는 최대 5개까지 등록할 수 있습니다.');
-          setModalOnConfirm(() => () => setModalOpen(false));
-          setModalOpen(true);
-          return;
-        }
-
         files.forEach((file) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             if (quillRef.current) {
               const editor = quillRef.current.getEditor();
               const range = editor.getSelection(true);
-              editor.insertEmbed(range.index, 'image', e.target.result);
+              editor.insertEmbed(range.index, 'image', e.target?.result);
             }
           };
           reader.readAsDataURL(file);
@@ -77,95 +65,44 @@ const WritePage = () => {
     return {
       toolbar: {
         container: [
-          [{ header: [1, 2, 3, 4, 5, 6, false] }],
+          [{ header: [1, 2, 3, false] }],
           ['bold', 'italic', 'underline', 'strike'],
           [{ color: [] }, { background: [] }],
-          ['link', 'image', 'video'],
+          ['link', 'image'],
           [{ align: [] }],
         ],
         handlers: {
           image: imageHandler,
         },
       },
-
       keyboard: {},
     };
   }, []);
 
+  // iOS 한글 엔터 커서 튐 방지
   useEffect(() => {
     if (!isIOS || !quillRef.current) return;
 
     const editor = quillRef.current.getEditor();
     if (!editor || iosEnterHandlerAppliedRef.current) return;
-
-    iosEnterHandlerAppliedRef.current = true;
-
-    const enterHandler = function (range, context) {
-      const currentIndex = range ? range.index : editor.getSelection()?.index;
-
-      if (currentIndex !== undefined) {
-        const formats = editor.getFormat(currentIndex);
-        editor.insertText(currentIndex, '\n', formats);
-        setTimeout(() => {
-          editor.setSelection(currentIndex + 1, 0);
-          editor.root.focus();
-        }, 50);
-      }
-
-      return false;
-    };
-
-    editor.keyboard.addBinding({ key: 13 }, enterHandler);
-    editor.keyboard.addBinding({ key: 13, shiftKey: true }, enterHandler);
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        const selection = editor.getSelection();
-        if (selection) {
-          e.preventDefault();
-          enterHandler(selection);
-        }
-      }
-    };
-
-    editor.root.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      if (editor && editor.root) {
-        editor.root.removeEventListener('keydown', handleKeyDown);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.style.scrollBehavior = 'auto';
-    return () => {
-      document.documentElement.style.scrollBehavior = '';
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isIOS || !quillRef.current) return;
-
-    const editor = quillRef.current.getEditor();
-    if (!editor || iosEnterHandlerAppliedRef.current) return;
-
     iosEnterHandlerAppliedRef.current = true;
 
     let isComposing = false;
 
-    // 한글 조합 시작/끝 감지
-    editor.root.addEventListener('compositionstart', () => {
+    const onCompositionStart = () => {
       isComposing = true;
-    });
-
-    editor.root.addEventListener('compositionend', () => {
+    };
+    const onCompositionEnd = () => {
       isComposing = false;
-    });
+    };
 
-    const enterHandler = function (range) {
-      const currentIndex = range ? range.index : editor.getSelection()?.index;
+    editor.root.addEventListener('compositionstart', onCompositionStart);
+    editor.root.addEventListener('compositionend', onCompositionEnd);
 
+    const enterHandler = (range) => {
+      if (isComposing) return true;
+
+      const currentIndex = range?.index ?? editor.getSelection()?.index;
       if (currentIndex !== undefined) {
         const formats = editor.getFormat(currentIndex);
         editor.insertText(currentIndex, '\n', formats);
@@ -174,29 +111,20 @@ const WritePage = () => {
           editor.root.focus();
         }, 30);
       }
-
       return false;
     };
 
-    editor.keyboard.addBinding({ key: 13 }, (range) => {
-      if (isComposing) return true; // 한글 조합 중이면 기본 동작 허용
-      return enterHandler(range);
-    });
-
-    editor.keyboard.addBinding({ key: 13, shiftKey: true }, (range) => {
-      if (isComposing) return true;
-      return enterHandler(range);
-    });
+    editor.keyboard.addBinding({ key: 13 }, enterHandler);
+    editor.keyboard.addBinding({ key: 13, shiftKey: true }, enterHandler);
 
     return () => {
-      editor.root.removeEventListener('compositionstart', () => {});
-      editor.root.removeEventListener('compositionend', () => {});
+      editor.root.removeEventListener('compositionstart', onCompositionStart);
+      editor.root.removeEventListener('compositionend', onCompositionEnd);
     };
   }, []);
 
   return (
     <div className='p-4'>
-      <h1>dtest</h1>
       <CustomEditor
         ref={quillRef}
         value={content}
@@ -224,14 +152,17 @@ const CustomEditor = styled(ReactQuill)`
     background-color: #f6f6f6;
     border-radius: 12px;
   }
+
   .ql-toolbar {
     border: none;
     background-color: #fff;
   }
+
   .ql-editor {
     font-size: 16px;
     color: #374151;
     min-height: 200px;
+
     @media (max-width: 440px) {
       padding-bottom: 120px;
       overflow-y: auto;
@@ -239,6 +170,7 @@ const CustomEditor = styled(ReactQuill)`
       -webkit-user-select: text;
     }
   }
+
   .ql-tooltip {
     z-index: 10000;
     position: absolute !important;
@@ -248,6 +180,7 @@ const CustomEditor = styled(ReactQuill)`
     padding: 5px;
     box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
   }
+
   .ql-editor iframe {
     width: 100%;
     max-width: 700px;
