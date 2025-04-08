@@ -1,129 +1,177 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import 'react-quill-new/dist/quill.snow.css';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
+import { useEffect } from 'react';
 import styled from 'styled-components';
 
-const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
-
-const isIOS =
-  typeof window !== 'undefined' &&
-  /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-const WritePage = () => {
-  const [content, setContent] = useState('');
-  const quillRef = useRef(null);
-  const isComposingRef = useRef(false);
-
-  const handleContentChange = (value) => {
-    setContent(value);
-  };
-
-  const modules = useMemo(() => {
-    return {
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['link', 'image'],
-      ],
-    };
-  }, []);
+const TipTapEditor = () => {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Underline,
+      Link,
+      Image,
+      Placeholder.configure({
+        placeholder: '내용을 입력해주세요',
+      }),
+    ],
+    content: '',
+  });
 
   useEffect(() => {
-    const quillInstance = quillRef.current?.getEditor();
-    if (!quillInstance) return;
+    if (!editor) return;
 
-    const editorRoot = quillInstance.root;
-
-    const handleCompositionStart = () => {
-      isComposingRef.current = true;
+    const handleLog = () => {
+      console.log(editor.getHTML()); // HTML 추출
     };
 
-    const handleCompositionEnd = () => {
-      isComposingRef.current = false;
-    };
-
-    const handleKeyDown = (e) => {
-      if (!isIOS) return;
-      if (e.key === 'Enter' && isComposingRef.current) {
-        e.preventDefault();
-        // iOS에서는 compositionend 직후 텍스트가 들어오므로 약간 delay 필요
-        setTimeout(() => {
-          const selection = quillInstance.getSelection();
-          if (selection) {
-            quillInstance.insertText(selection.index, '\n');
-            quillInstance.setSelection(selection.index + 1, 0);
-          }
-        }, 10);
-      }
-    };
-
-    editorRoot.addEventListener('compositionstart', handleCompositionStart);
-    editorRoot.addEventListener('compositionend', handleCompositionEnd);
-    editorRoot.addEventListener('keydown', handleKeyDown);
-
+    window.addEventListener('beforeunload', handleLog);
     return () => {
-      editorRoot.removeEventListener(
-        'compositionstart',
-        handleCompositionStart
-      );
-      editorRoot.removeEventListener('compositionend', handleCompositionEnd);
-      editorRoot.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('beforeunload', handleLog);
     };
-  }, []);
+  }, [editor]);
+
+  if (!editor) return null;
 
   return (
     <div className='p-4'>
-      <CustomEditor
-        ref={quillRef}
-        value={content}
-        onChange={handleContentChange}
-        modules={modules}
-        theme='snow'
-        placeholder='내용을 입력해주세요'
-        style={{
-          height: '280px',
-          marginBottom: '84px',
-          marginTop: '12px',
-        }}
-      />
+      <Toolbar>
+        <button
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
+        >
+          H1
+        </button>
+        <button
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
+        >
+          H2
+        </button>
+        <button
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
+        >
+          H3
+        </button>
+        <button onClick={() => editor.chain().focus().toggleBold().run()}>
+          Bold
+        </button>
+        <button onClick={() => editor.chain().focus().toggleItalic().run()}>
+          Italic
+        </button>
+        <button onClick={() => editor.chain().focus().toggleUnderline().run()}>
+          Underline
+        </button>
+        <button onClick={() => editor.chain().focus().toggleBulletList().run()}>
+          • List
+        </button>
+        <button
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          1. List
+        </button>
+        <button
+          onClick={() => {
+            const url = prompt('링크 주소를 입력해주세요');
+            if (url) editor.chain().focus().setLink({ href: url }).run();
+          }}
+        >
+          Link
+        </button>
+        <button
+          onClick={() => {
+            const url = prompt('이미지 주소를 입력해주세요');
+            if (url) editor.chain().focus().setImage({ src: url }).run();
+          }}
+        >
+          Image
+        </button>
+      </Toolbar>
+
+      <EditorWrapper>
+        <StyledEditor editor={editor} />
+      </EditorWrapper>
     </div>
   );
 };
 
-export default WritePage;
+export default TipTapEditor;
 
-const CustomEditor = styled(ReactQuill)`
-  .ql-container {
-    border: none;
-    background-color: #f6f6f6;
-    border-radius: 12px;
-  }
-  .ql-toolbar {
-    border: none;
-    background-color: #fff;
-  }
-  .ql-editor {
-    font-size: 16px;
-    color: #374151;
-    min-height: 200px;
-  }
-  .ql-tooltip {
-    z-index: 10000;
-    position: absolute !important;
-    left: 0 !important;
+const Toolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #000;
+  button {
     background-color: #fff;
     border: 1px solid #ddd;
-    padding: 5px;
-    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    &:hover {
+      background-color: #f3f3f3;
+    }
   }
-  .ql-editor iframe {
-    width: 100%;
-    max-width: 700px;
-    aspect-ratio: 16 / 9;
-    display: block;
-    margin: 16px auto;
+`;
+
+const EditorWrapper = styled.div`
+  background-color: #f6f6f6;
+  border-radius: 12px;
+  min-height: 280px;
+  padding: 16px;
+`;
+
+const StyledEditor = styled(EditorContent)`
+  .ProseMirror {
+    font-size: 16px;
+    color: #000;
+    outline: none;
+    min-height: 200px;
+
+    img {
+      max-width: 100%;
+      margin: 12px 0;
+      display: block;
+    }
+
+    a {
+      color: #000;
+      text-decoration: underline;
+    }
+
+    ul,
+    ol {
+      padding-left: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin: 12px 0;
+    }
+
+    h2 {
+      font-size: 20px;
+      margin: 10px 0;
+    }
+
+    h3 {
+      font-size: 18px;
+      margin: 8px 0;
+    }
   }
 `;
