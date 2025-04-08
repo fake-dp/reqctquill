@@ -144,8 +144,59 @@ const WritePage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isIOS || !quillRef.current) return;
+
+    const editor = quillRef.current.getEditor();
+    if (!editor || iosEnterHandlerAppliedRef.current) return;
+
+    iosEnterHandlerAppliedRef.current = true;
+
+    let isComposing = false;
+
+    // 한글 조합 시작/끝 감지
+    editor.root.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+
+    editor.root.addEventListener('compositionend', () => {
+      isComposing = false;
+    });
+
+    const enterHandler = function (range) {
+      const currentIndex = range ? range.index : editor.getSelection()?.index;
+
+      if (currentIndex !== undefined) {
+        const formats = editor.getFormat(currentIndex);
+        editor.insertText(currentIndex, '\n', formats);
+        setTimeout(() => {
+          editor.setSelection(currentIndex + 1, 0);
+          editor.root.focus();
+        }, 30);
+      }
+
+      return false;
+    };
+
+    editor.keyboard.addBinding({ key: 13 }, (range) => {
+      if (isComposing) return true; // 한글 조합 중이면 기본 동작 허용
+      return enterHandler(range);
+    });
+
+    editor.keyboard.addBinding({ key: 13, shiftKey: true }, (range) => {
+      if (isComposing) return true;
+      return enterHandler(range);
+    });
+
+    return () => {
+      editor.root.removeEventListener('compositionstart', () => {});
+      editor.root.removeEventListener('compositionend', () => {});
+    };
+  }, []);
+
   return (
     <div className='p-4'>
+      <h1>dtest</h1>
       <CustomEditor
         ref={quillRef}
         value={content}
