@@ -32,8 +32,10 @@ const WritePage = () => {
   }, []);
 
   useEffect(() => {
-    const editor = quillRef.current?.getEditor();
-    if (!editor) return;
+    const quillInstance = quillRef.current?.getEditor();
+    if (!quillInstance) return;
+
+    const editorRoot = quillInstance.root;
 
     const handleCompositionStart = () => {
       isComposingRef.current = true;
@@ -44,23 +46,31 @@ const WritePage = () => {
     };
 
     const handleKeyDown = (e) => {
+      if (!isIOS) return;
       if (e.key === 'Enter' && isComposingRef.current) {
         e.preventDefault();
-        editor.insertText(editor.getSelection().index, '\n');
+        // iOS에서는 compositionend 직후 텍스트가 들어오므로 약간 delay 필요
+        setTimeout(() => {
+          const selection = quillInstance.getSelection();
+          if (selection) {
+            quillInstance.insertText(selection.index, '\n');
+            quillInstance.setSelection(selection.index + 1, 0);
+          }
+        }, 10);
       }
     };
 
-    editor.root.addEventListener('compositionstart', handleCompositionStart);
-    editor.root.addEventListener('compositionend', handleCompositionEnd);
-    editor.root.addEventListener('keydown', handleKeyDown);
+    editorRoot.addEventListener('compositionstart', handleCompositionStart);
+    editorRoot.addEventListener('compositionend', handleCompositionEnd);
+    editorRoot.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      editor.root.removeEventListener(
+      editorRoot.removeEventListener(
         'compositionstart',
         handleCompositionStart
       );
-      editor.root.removeEventListener('compositionend', handleCompositionEnd);
-      editor.root.removeEventListener('keydown', handleKeyDown);
+      editorRoot.removeEventListener('compositionend', handleCompositionEnd);
+      editorRoot.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
