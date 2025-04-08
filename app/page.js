@@ -20,12 +20,25 @@ export default function QuillTestPage() {
     []
   );
 
+  const handleKeyUp = () => {
+    const editor = quillRef.current?.getEditor?.();
+    if (editor) {
+      const editorElem = editor.root;
+      if (editorElem.innerHTML === '<p><br></p>') {
+        editorElem.classList.add('ql-blank');
+      } else {
+        editorElem.classList.remove('ql-blank');
+      }
+    }
+  };
+
   return (
     <div style={{ padding: 20 }}>
       <CustomEditor
         ref={quillRef}
         value={content}
         onChange={setContent}
+        onKeyUp={handleKeyUp} // 🔥 여기 적용
         placeholder='내용을 입력해주세요'
         modules={modules}
         theme='snow'
