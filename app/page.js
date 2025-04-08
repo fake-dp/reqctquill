@@ -16,11 +16,18 @@ export default function QuillTestPage() {
   const quillRef = useRef(null);
 
   const modules = useMemo(
-    () => ({ toolbar: [['bold', 'italic', 'underline']] }),
+    () => ({
+      toolbar: [['bold', 'italic', 'underline']],
+    }),
     []
   );
 
-  const handleKeyUp = () => {
+  // ✅ 추가 테스트용 onKeyUp / onKeyDown 핸들러
+  const handleKeyDown = (e) => {
+    console.log('KeyDown:', e.key);
+  };
+
+  const handleKeyUp = (e) => {
     const editor = quillRef.current?.getEditor?.();
     if (editor) {
       const editorElem = editor.root;
@@ -30,6 +37,7 @@ export default function QuillTestPage() {
         editorElem.classList.remove('ql-blank');
       }
     }
+    console.log('KeyUp:', e.key);
   };
 
   return (
@@ -38,7 +46,6 @@ export default function QuillTestPage() {
         ref={quillRef}
         value={content}
         onChange={setContent}
-        onKeyUp={handleKeyUp} // 🔥 여기 적용
         placeholder='내용을 입력해주세요'
         modules={modules}
         theme='snow'
@@ -46,6 +53,8 @@ export default function QuillTestPage() {
           height: '300px',
           marginBottom: '40px',
         }}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
       />
       <div>실시간 값:</div>
       <pre>{content}</pre>
