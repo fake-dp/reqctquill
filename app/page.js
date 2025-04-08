@@ -14,7 +14,7 @@ const isIOS =
 const WritePage = () => {
   const [content, setContent] = useState('');
   const quillRef = useRef(null);
-  const isComposingRef = useRef(false); // 한글 조합 중 상태
+  const isComposingRef = useRef(false);
 
   const handleContentChange = (value) => {
     setContent(value);
@@ -22,52 +22,37 @@ const WritePage = () => {
 
   const modules = useMemo(() => {
     return {
-      toolbar: {
-        container: [
-          [{ header: [1, 2, false] }],
-          ['bold', 'italic', 'underline'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['link', 'image'],
-        ],
-      },
-      keyboard: {}, // 커스텀 바인딩은 useEffect에서 처리
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image'],
+      ],
     };
   }, []);
 
   useEffect(() => {
-    if (!isIOS || !quillRef.current) return;
-
-    const editor = quillRef.current.getEditor();
+    const editor = quillRef.current?.getEditor();
     if (!editor) return;
 
-    const enterHandler = (range) => {
-      const currentIndex = range?.index ?? editor.getSelection()?.index;
-      if (typeof currentIndex === 'number') {
-        const formats = editor.getFormat(currentIndex);
-        editor.insertText(currentIndex, '\n', formats);
-        setTimeout(() => {
-          editor.setSelection(currentIndex + 1, 0);
-        }, 30);
-      }
-      return false;
-    };
-
-    // 한글 조합 감지
     const handleCompositionStart = () => {
       isComposingRef.current = true;
     };
+
     const handleCompositionEnd = () => {
       isComposingRef.current = false;
     };
 
-    // 엔터 바인딩 추가
-    editor.keyboard.addBinding({ key: 13 }, (range) => {
-      if (isComposingRef.current) return true;
-      return enterHandler(range);
-    });
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && isComposingRef.current) {
+        e.preventDefault();
+        editor.insertText(editor.getSelection().index, '\n');
+      }
+    };
 
     editor.root.addEventListener('compositionstart', handleCompositionStart);
     editor.root.addEventListener('compositionend', handleCompositionEnd);
+    editor.root.addEventListener('keydown', handleKeyDown);
 
     return () => {
       editor.root.removeEventListener(
@@ -75,22 +60,23 @@ const WritePage = () => {
         handleCompositionStart
       );
       editor.root.removeEventListener('compositionend', handleCompositionEnd);
+      editor.root.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
   return (
     <div className='p-4'>
-      <h2>iOS 한글 줄바꿈 테스트</h2>
       <CustomEditor
         ref={quillRef}
         value={content}
         onChange={handleContentChange}
-        theme='snow'
-        placeholder='한글로 입력하고 엔터를 쳐보세요'
         modules={modules}
+        theme='snow'
+        placeholder='내용을 입력해주세요'
         style={{
-          height: '300px',
-          marginBottom: '60px',
+          height: '280px',
+          marginBottom: '84px',
+          marginTop: '12px',
         }}
       />
     </div>
@@ -101,14 +87,33 @@ export default WritePage;
 
 const CustomEditor = styled(ReactQuill)`
   .ql-container {
-    border: 1px solid #ccc;
-    border-radius: 8px;
+    border: none;
+    background-color: #f6f6f6;
+    border-radius: 12px;
+  }
+  .ql-toolbar {
+    border: none;
     background-color: #fff;
   }
   .ql-editor {
     font-size: 16px;
+    color: #374151;
     min-height: 200px;
-    padding: 10px;
-    color: #333;
+  }
+  .ql-tooltip {
+    z-index: 10000;
+    position: absolute !important;
+    left: 0 !important;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 5px;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+  }
+  .ql-editor iframe {
+    width: 100%;
+    max-width: 700px;
+    aspect-ratio: 16 / 9;
+    display: block;
+    margin: 16px auto;
   }
 `;
