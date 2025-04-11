@@ -98,28 +98,39 @@ const TipTapEditor = () => {
     input.type = 'file';
     input.accept = 'image/*';
     input.multiple = true;
-
-    input.onchange = () => {
+    input.onchange = async () => {
       const files = Array.from(input.files || []);
       if (!files.length) return;
+      if (files.length > 5) {
+        alert('이미지는 최대 5개까지 업로드할 수 있습니다.');
+        return;
+      }
 
-      files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64 = event.target?.result;
-          if (base64 && editor) {
-            editor
-              .chain()
-              .focus()
-              .insertContent({
-                type: 'image',
-                attrs: { src: base64 },
-              })
-              .run();
-          }
-        };
-        reader.readAsDataURL(file);
-      });
+      const base64List = await Promise.all(
+        files.map((file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({ src: reader.result?.toString(), name: file.name });
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const validImages = base64List.filter((item) => item?.src);
+      if (!validImages.length) return;
+
+      const nodes = validImages.flatMap(({ src, name }) => [
+        { type: 'image', attrs: { src, alt: name } },
+        { type: 'paragraph' },
+      ]);
+
+      editor
+        ?.chain()
+        .focus()
+        .insertContent({ type: 'doc', content: nodes })
+        .run();
     };
 
     input.click();
