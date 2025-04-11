@@ -97,17 +97,31 @@ const TipTapEditor = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
+    input.multiple = true;
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result;
-        editor?.chain().focus().setImage({ src: base64 }).run();
-      };
-      reader.readAsDataURL(file);
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target?.result;
+          if (base64 && editor) {
+            editor
+              .chain()
+              .focus()
+              .insertContent({
+                type: 'image',
+                attrs: { src: base64 },
+              })
+              .run();
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     };
+
     input.click();
   };
 
@@ -364,15 +378,16 @@ const StyledEditor = styled(EditorContent)`
     h3 {
       font-size: 1.125rem;
     }
+
     ul,
     ol {
       padding-left: 20px;
     }
-    img,
+
     iframe {
       width: 100%;
-      aspect-ratio: 16 / 9;
-      border: none;
+      height: auto;
+      max-width: 100%;
       display: block;
       margin: 12px 0;
     }
