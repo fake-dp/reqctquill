@@ -37,33 +37,23 @@ const TipTapEditor = () => {
   const [title, setTitle] = useState('');
   const [charCount, setCharCount] = useState(0);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [showYoutubeInput, setShowYoutubeInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [activeUrlType, setActiveUrlType] = useState(null);
   const urlInputRef = useRef(null);
 
   const toggleDropdown = (key) => {
     setOpenDropdown((prev) => (prev === key ? null : key));
-    setShowLinkInput(false);
-    setShowYoutubeInput(false);
+    setActiveUrlType(null);
   };
 
-  const closeAll = () => {
-    setOpenDropdown(null);
-    setShowLinkInput(false);
-    setShowYoutubeInput(false);
-  };
-
-  const toggleLinkInput = () => {
-    setShowLinkInput((prev) => !prev);
-    setShowYoutubeInput(false);
+  const toggleUrlInput = (type) => {
+    setActiveUrlType((prev) => (prev === type ? null : type));
     setOpenDropdown(null);
   };
 
-  const toggleYoutubeInput = () => {
-    setShowYoutubeInput((prev) => !prev);
-    setShowLinkInput(false);
+  const closeDropdown = () => {
     setOpenDropdown(null);
+    setActiveUrlType(null);
   };
 
   const editor = useEditor({
@@ -87,7 +77,7 @@ const TipTapEditor = () => {
     editorProps: {
       handleDOMEvents: {
         mousedown: () => {
-          closeAll();
+          if (openDropdown || activeUrlType) closeDropdown();
         },
       },
     },
@@ -121,36 +111,31 @@ const TipTapEditor = () => {
     input.click();
   };
 
-  const applyUrl = (type) => {
+  const applyUrl = () => {
     if (!urlInput) return;
     const formattedUrl = urlInput.startsWith('http')
       ? urlInput
       : `https://${urlInput}`;
 
-    if (type === 'link') {
+    if (activeUrlType === 'link') {
       editor
         ?.chain()
         .focus()
         .extendMarkRange('link')
         .setLink({ href: formattedUrl })
         .run();
-    } else if (type === 'youtube') {
-      editor
-        ?.chain()
-        .focus()
-        .setYoutubeVideo({ src: formattedUrl, width: 640, height: 360 })
-        .run();
+    } else if (activeUrlType === 'youtube') {
+      editor?.chain().focus().setYoutubeVideo({ src: formattedUrl }).run();
     }
     setUrlInput('');
-    setShowLinkInput(false);
-    setShowYoutubeInput(false);
+    setActiveUrlType(null);
   };
 
   useEffect(() => {
-    if ((showLinkInput || showYoutubeInput) && urlInputRef.current) {
+    if (activeUrlType && urlInputRef.current) {
       urlInputRef.current.focus();
     }
-  }, [showLinkInput, showYoutubeInput]);
+  }, [activeUrlType]);
 
   return (
     <Wrapper>
@@ -175,7 +160,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().setParagraph().run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 Normal
@@ -183,7 +168,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().toggleHeading({ level: 1 }).run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 H1
@@ -191,7 +176,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().toggleHeading({ level: 2 }).run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 H2
@@ -199,7 +184,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().toggleHeading({ level: 3 }).run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 H3
@@ -238,7 +223,7 @@ const TipTapEditor = () => {
                   color={color}
                   onClick={() => {
                     editor?.chain().focus().setColor(color).run();
-                    closeAll();
+                    closeDropdown();
                   }}
                 />
               ))}
@@ -260,7 +245,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().setTextAlign('left').run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 Left
@@ -268,7 +253,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().setTextAlign('center').run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 Center
@@ -276,7 +261,7 @@ const TipTapEditor = () => {
               <div
                 onClick={() => {
                   editor?.chain().focus().setTextAlign('right').run();
-                  closeAll();
+                  closeDropdown();
                 }}
               >
                 Right
@@ -285,26 +270,12 @@ const TipTapEditor = () => {
           )}
         </Dropdown>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLinkInput();
-          }}
-        >
-          🔗
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleYoutubeInput();
-          }}
-        >
-          ▶️
-        </button>
+        <button onClick={() => toggleUrlInput('link')}>🔗</button>
+        <button onClick={() => toggleUrlInput('youtube')}>▶️</button>
         <button onClick={handleImageUpload}>🖼</button>
       </Toolbar>
 
-      {(showLinkInput || showYoutubeInput) && (
+      {activeUrlType && (
         <UrlInputContainer>
           <input
             ref={urlInputRef}
@@ -312,10 +283,9 @@ const TipTapEditor = () => {
             placeholder='URL을 입력하세요'
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
+            style={{ color: '#333' }}
           />
-          <button onClick={() => applyUrl(showLinkInput ? 'link' : 'youtube')}>
-            적용
-          </button>
+          <button onClick={applyUrl}>적용</button>
         </UrlInputContainer>
       )}
 
@@ -394,15 +364,17 @@ const StyledEditor = styled(EditorContent)`
     h3 {
       font-size: 1.125rem;
     }
-
     ul,
     ol {
       padding-left: 20px;
     }
-    img {
-      max-width: 100%;
+    img,
+    iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
       display: block;
-      margin: 10px 0;
+      margin: 12px 0;
     }
     a {
       color: #007aff;
@@ -486,7 +458,7 @@ const ColorChip = styled.div`
 const UrlInputContainer = styled.div`
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin: 12px 0;
   input {
     flex: 1;
     padding: 8px;
